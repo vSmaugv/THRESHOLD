@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<meta name="color-scheme" content="dark">
+<title>…</title>
+<link rel="icon" href="data:,">
+
+<!--
+  ARCHIVOS (todos en la misma carpeta):
+    index.html               <- este archivo
+    the-great-outdoors.mp3   <- el audio (se carga localmente, sin URLs externas)
+
+  Única dependencia externa: las tipografías de Google Fonts. Si no cargan,
+  la página usa tipografías del sistema y el layout no se rompe.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400&family=Jost:wght@300&display=swap" rel="stylesheet">
+
+<style>
+:root{
+    --void:#040405;
+    --ash:#bdbab1;
+    --dim:#77746d;
+    --scar:107,38,38;      /* solo para el glitch, casi imperceptible */
+    --cold:63,90,102;      /* idem */
+    --num-size:clamp(2.2rem, min(13vw, 24vh), 9.5rem);
+    --px:0;
+    --py:0;
+}
+@media (min-width:701px){
+    :root{ --num-size:clamp(3.4rem, min(8.6vw, 26vh), 9.5rem); }
+}
+
+*{ margin:0; padding:0; box-sizing:border-box; }
+
+html,body{
+    width:100%;
+    height:100%;
+    overflow:hidden;
+    background:var(--void);
+    overscroll-behavior:none;
+}
+body{
+    height:100vh;
+    height:100dvh;
+    color:var(--ash);
+    font-family:"Jost", "Helvetica Neue", Arial, sans-serif;
+    font-weight:300;
+    -webkit-font-smoothing:antialiased;
+    -webkit-tap-highlight-color:transparent;
+    -webkit-user-select:none;
+    user-select:none;
+}
+
+/* ---------- ambiente: luz, niebla, polvo ---------- */
+.depth{
+    position:fixed;
+    inset:-6%;
+    z-index:1;
+    pointer-events:none;
+    transform:translate3d(calc(var(--px) * -14px), calc(var(--py) * -9px), 0);
+    transition:transform 1.2s cubic-bezier(.2,.6,.2,1);
+}
+.light{
+    position:absolute;
+    inset:0;
+    background:
+        radial-gradient(ellipse 42% 62% at 50% -4%, rgba(160,158,150,.15), transparent 72%),
+        radial-gradient(ellipse 52% 20% at 50% 68%, rgba(120,118,112,.055), transparent 72%);
+    animation:lamp 17s linear infinite;
+}
+@keyframes lamp{
+    0%,88%,100%{ opacity:1; }
+    89%{ opacity:.55; }
+    89.6%{ opacity:1; }
+    90.4%{ opacity:.3; }
+    91.2%{ opacity:.9; }
+    92%{ opacity:1; }
+}
+.fog{
+    position:absolute;
+    inset:-15%;
+    will-change:transform;
+}
+.fog.a{
+    background:
+        radial-gradient(ellipse 38% 28% at 28% 62%, rgba(92,94,98,.11), transparent 70%),
+        radial-gradient(ellipse 30% 22% at 78% 38%, rgba(80,80,86,.085), transparent 70%);
+    animation:driftA 70s ease-in-out infinite alternate;
+}
+.fog.b{
+    background:
+        radial-gradient(ellipse 45% 24% at 62% 74%, rgba(70,74,78,.10), transparent 70%),
+        radial-gradient(ellipse 28% 30% at 16% 26%, rgba(78,78,82,.07), transparent 70%);
+    animation:driftB 105s ease-in-out infinite alternate;
+}
+@keyframes driftA{
+    from{ transform:translate3d(-4%,1%,0) scale(1); }
+    to{   transform:translate3d(5%,-2%,0) scale(1.14); }
+}
+@keyframes driftB{
+    from{ transform:translate3d(4%,-1%,0) scale(1.1); }
+    to{   transform:translate3d(-5%,2%,0) scale(1); }
+}
+.dust i{
+    position:absolute;
+    bottom:-6px;
+    border-radius:50%;
+    background:#cfcbc0;
+    opacity:0;
+    animation:mote linear infinite;
+}
+@keyframes mote{
+    0%{   transform:translate3d(0,0,0); opacity:0; }
+    12%{  opacity:var(--o, .2); }
+    88%{  opacity:var(--o, .2); }
+    100%{ transform:translate3d(var(--dx, 20px), -108vh, 0); opacity:0; }
+}
+
+/* ---------- grano + viñeta (por encima de todo) ---------- */
+.grain{
+    position:fixed;
+    top:-50%;
+    left:-50%;
+    width:200%;
+    height:200%;
+    z-index:60;
+    pointer-events:none;
+    opacity:.085;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 1.1 -.15'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size:180px 180px;
+    animation:grain .9s steps(1) infinite;
+}
+@keyframes grain{
+    0%{   transform:translate3d(0,0,0); }
+    20%{  transform:translate3d(-5%,3%,0); }
+    40%{  transform:translate3d(4%,-6%,0); }
+    60%{  transform:translate3d(-3%,5%,0); }
+    80%{  transform:translate3d(6%,2%,0); }
+    100%{ transform:translate3d(0,0,0); }
+}
+.vignette{
+    position:fixed;
+    inset:0;
+    z-index:61;
+    pointer-events:none;
+    background:radial-gradient(ellipse at 50% 46%, transparent 28%, rgba(0,0,0,.5) 68%, rgba(0,0,0,.93) 100%);
+}
+
+/* ---------- pantalla inicial ---------- */
+#entry{
+    position:fixed;
+    inset:0;
+    z-index:50;
+    background:#000;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    outline:none;
+    transition:opacity 2.8s ease .7s, visibility 0s linear 3.5s;
+}
+#entry.gone{
+    opacity:0;
+    visibility:hidden;
+    pointer-events:none;
+}
+.entry-fade{
+    transition:opacity 1.3s ease;
+}
+#entry.gone .entry-fade{ opacity:0; }
+.entry-text{
+    display:block;
+    font-size:.78rem;
+    letter-spacing:.62em;
+    padding-left:.62em;           /* compensa el espaciado final para centrar */
+    color:var(--dim);
+    animation:breathe 7s ease-in-out infinite;
+}
+@keyframes breathe{
+    0%,100%{ opacity:.14; }
+    50%{     opacity:.75; }
+}
+#entry:focus-visible .entry-text{ color:var(--ash); }
+
+/* ---------- escena ---------- */
+#stage{
+    position:fixed;
+    inset:0;
+    z-index:5;
+    display:grid;
+    place-items:center;
+    opacity:0;
+    filter:blur(7px);
+    transition:opacity 4.5s ease 1.2s, filter 4.5s ease 1.2s;
+}
+#stage.on{
+    opacity:1;
+    filter:none;
+}
+.counter-wrap{
+    position:relative;
+    font-size:var(--num-size);
+    line-height:1;
+}
+.halo{
+    position:absolute;
+    left:50%;
+    top:50%;
+    width:150%;
+    height:280%;
+    transform:translate(-50%,-50%);
+    background:radial-gradient(closest-side, rgba(189,186,177,.10), transparent 78%);
+    pointer-events:none;
+    animation:halo 9s ease-in-out infinite;
+}
+@keyframes halo{
+    0%,100%{ opacity:.5; }
+    50%{     opacity:1; }
+}
+.counter{
+    position:relative;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-family:"Cormorant Garamond", "Cormorant", Garamond, Georgia, "Times New Roman", serif;
+    font-weight:300;
+    font-feature-settings:"lnum" 1, "tnum" 1;
+    font-variant-numeric:lining-nums tabular-nums;
+    color:var(--ash);
+    text-shadow:0 0 .22em rgba(189,186,177,.20), 0 0 .9em rgba(189,186,177,.09);
+    white-space:nowrap;
+}
+.grp{ display:inline-flex; }
+.d{
+    display:inline-block;
+    width:.54em;
+    text-align:center;
+}
+.d.tick{ animation:tickIn 1s ease-out; }
+@keyframes tickIn{
+    from{ opacity:.18; }
+    to{   opacity:1; }
+}
+.sep{
+    position:relative;
+    display:inline-block;
+    width:.5em;
+    height:1em;
+    color:var(--dim);
+    opacity:.6;
+    animation:sepBreathe 4s ease-in-out infinite;
+}
+.sep::before,
+.sep::after{
+    content:"";
+    position:absolute;
+    left:50%;
+    width:.052em;
+    height:.052em;
+    border-radius:50%;
+    background:currentColor;
+    transform:translateX(-50%);
+}
+.sep::before{ top:.36em; }
+.sep::after{  top:.59em; }
+@keyframes sepBreathe{
+    0%,100%{ opacity:.28; }
+    50%{     opacity:.7; }
+}
+
+/* glitch muy sutil: un desgarro breve y raro */
+.counter.glitch{ animation:tear .36s steps(1, end) 1; }
+@keyframes tear{
+    0%{   transform:none; clip-path:inset(0); filter:none; }
+    10%{  transform:translate3d(-.045em,0,0) skewX(-2deg); clip-path:inset(0 0 58% 0);
+          filter:drop-shadow(.03em 0 0 rgba(var(--scar),.55)) drop-shadow(-.03em 0 0 rgba(var(--cold),.5)); }
+    22%{  transform:translate3d(.055em,0,0); clip-path:inset(46% 0 0 0);
+          filter:drop-shadow(-.03em 0 0 rgba(var(--scar),.5)) drop-shadow(.03em 0 0 rgba(var(--cold),.45)); }
+    34%{  transform:none; clip-path:inset(0); filter:none; }
+    50%{  transform:translate3d(.02em,0,0) skewX(1deg); clip-path:inset(22% 0 44% 0);
+          filter:drop-shadow(.025em 0 0 rgba(var(--scar),.45)); }
+    62%,100%{ transform:none; clip-path:inset(0); filter:none; }
+}
+
+/* frase mínima: si querés quitarla, borrá este bloque y el <p class="whisper"> */
+.whisper{
+    position:absolute;
+    top:100%;
+    left:0;
+    right:0;
+    margin-top:2.4rem;
+    text-align:center;
+    font-family:"Jost", "Helvetica Neue", Arial, sans-serif;
+    font-weight:300;
+    font-size:.8rem;
+    letter-spacing:.34em;
+    padding-left:.34em;
+    color:var(--dim);
+    opacity:0;
+}
+#stage.on .whisper{ animation:whisperIn 6s ease 8s forwards; }
+@keyframes whisperIn{
+    from{ opacity:0; }
+    to{   opacity:.6; }
+}
+
+/* ---------- control de audio ---------- */
+.sound{
+    position:fixed;
+    z-index:70;
+    right:max(.9rem, env(safe-area-inset-right));
+    bottom:max(.9rem, env(safe-area-inset-bottom));
+    width:44px;
+    height:44px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:4px;
+    background:none;
+    border:0;
+    cursor:pointer;
+    opacity:0;
+    pointer-events:none;
+    transition:opacity 3s ease 5s;
+    outline:none;
+}
+body.entered .sound{ opacity:.36; pointer-events:auto; }
+body.entered .sound:hover,
+.sound:focus-visible{ opacity:.85; transition-delay:0s; transition-duration:.4s; }
+.sound:focus-visible{ outline:1px solid var(--dim); outline-offset:-6px; }
+.sound i{
+    display:block;
+    width:1px;
+    height:14px;
+    background:var(--ash);
+    transform-origin:50% 100%;
+    animation:bars 3.6s ease-in-out infinite;
+}
+.sound i:nth-child(2){ animation-delay:-.9s;  animation-duration:4.4s; }
+.sound i:nth-child(3){ animation-delay:-1.8s; animation-duration:3.1s; }
+.sound i:nth-child(4){ animation-delay:-2.7s; animation-duration:5s; }
+@keyframes bars{
+    0%,100%{ transform:scaleY(.25); }
+    50%{     transform:scaleY(1); }
+}
+.sound.muted i{
+    animation:none;
+    transform:scaleY(.14);
+}
+.sound.broken{ display:none; }
+
+/* ---------- responsive ---------- */
+@media (max-width:700px){
+    .entry-text{ font-size:.7rem; letter-spacing:.5em; padding-left:.5em; }
+    .whisper{ font-size:.7rem; letter-spacing:.28em; padding-left:.28em; margin-top:1.8rem; }
+}
+@media (max-height:420px){
+    .whisper{ margin-top:1.2rem; }
+}
+
+/* ---------- movimiento reducido ---------- */
+@media (prefers-reduced-motion:reduce){
+    .grain, .fog, .light, .halo, .sep, .sound i, .entry-text{ animation:none !important; }
+    .entry-text{ opacity:.5; }
+    .depth{ transition:none; }
+    #stage{ filter:none; transition:opacity 1.5s ease; }
+    #stage.on .whisper{ animation:none; opacity:.6; }
+}
+</style>
+
+<noscript>
+<style>
+    #entry{ display:none; }
+    #stage{ opacity:1; filter:none; }
+</style>
+</noscript>
+</head>
+
+<body>
+
+<!-- Ambiente -->
+<div class="depth" aria-hidden="true">
+    <div class="fog a"></div>
+    <div class="fog b"></div>
+    <div class="light"></div>
+    <div class="dust" id="dust"></div>
+</div>
+
+<!-- Pantalla inicial: intercepta la interacción hasta el primer click -->
+<div id="entry" role="button" tabindex="0" aria-label="Click to continue">
+    <span class="entry-fade"><span class="entry-text">CLICK TO CONTINUE</span></span>
+</div>
+
+<!-- Escena -->
+<main id="stage">
+    <div class="counter-wrap">
+        <div class="halo" aria-hidden="true"></div>
+        <div class="counter" id="counter" role="timer" aria-label="Cuenta regresiva">
+            <span class="grp" id="g-d"><span class="d">0</span><span class="d">0</span></span>
+            <span class="sep"></span>
+            <span class="grp" id="g-h"><span class="d">0</span><span class="d">0</span></span>
+            <span class="sep"></span>
+            <span class="grp" id="g-m"><span class="d">0</span><span class="d">0</span></span>
+            <span class="sep"></span>
+            <span class="grp" id="g-s"><span class="d">0</span><span class="d">0</span></span>
+        </div>
+        <p class="whisper" lang="en">Something is coming.</p>
+    </div>
+</main>
+
+<!-- Audio local. Sin autoplay: solo se reproduce desde el handler del click inicial. -->
+<audio id="bg-audio" loop preload="auto" playsinline>
+    <source src="the-great-outdoors.mp3" type="audio/mpeg">
+</audio>
+
+<button class="sound" id="sound" type="button" aria-label="Silenciar audio" aria-pressed="false">
+    <i></i><i></i><i></i><i></i>
+</button>
+
+<div class="grain" aria-hidden="true"></div>
+<div class="vignette" aria-hidden="true"></div>
+
+<script>
+(function () {
+    "use strict";
+
+    var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    /* =========================================================
+       CONTADOR
+       Misma lógica de fecha que la página anterior: cuenta atrás
+       hasta el 3 de diciembre a las 20:30 (hora local del navegador
+       de quien visita); si ya pasó este año, apunta al año siguiente.
+       Lo único que cambió es la presentación: los meses se suman a los
+       días, así se muestra DD : HH : MM : SS.
+       ========================================================= */
+    var targetDate = new Date();
+    targetDate.setMonth(11, 3); // diciembre = mes 11 (0-indexado), día 3
+    targetDate.setHours(20, 30, 0, 0);
+
+    // si esa fecha ya pasó este año, apunta al 3 de diciembre del año que viene
+    if (targetDate < new Date()) {
+        targetDate.setFullYear(targetDate.getFullYear() + 1);
+    }
+
+    function pad(n) {
+        return n.toString().padStart(2, "0");
+    }
+
+    function getTimeRemaining(target) {
+        var remainMs = Math.max(0, target - new Date());
+        var days = Math.floor(remainMs / 86400000);
+        remainMs -= days * 86400000;
+        var hours = Math.floor(remainMs / 3600000);
+        remainMs -= hours * 3600000;
+        var minutes = Math.floor(remainMs / 60000);
+        remainMs -= minutes * 60000;
+        var seconds = Math.floor(remainMs / 1000);
+        return { days: days, hours: hours, minutes: minutes, seconds: seconds };
+    }
+
+    var groups = {
+        d: document.getElementById("g-d"),
+        h: document.getElementById("g-h"),
+        m: document.getElementById("g-m"),
+        s: document.getElementById("g-s")
+    };
+    var firstRender = true;
+
+    function setGroup(el, text) {
+        // los días pueden pasar de 99 (3 dígitos): se agregan/quitan celdas según haga falta
+        while (el.children.length < text.length) {
+            var extra = document.createElement("span");
+            extra.className = "d";
+            el.insertBefore(extra, el.firstChild);
+        }
+        while (el.children.length > text.length) {
+            el.removeChild(el.firstChild);
+        }
+        for (var i = 0; i < text.length; i++) {
+            var cell = el.children[i];
+            if (cell.textContent !== text.charAt(i)) {
+                cell.textContent = text.charAt(i);
+                if (!firstRender && !reduceMotion) {
+                    cell.classList.remove("tick");
+                    void cell.offsetWidth; // reinicia la animación
+                    cell.classList.add("tick");
+                }
+            }
+        }
+    }
+
+    function tick() {
+        var t = getTimeRemaining(targetDate);
+        setGroup(groups.d, pad(t.days));
+        setGroup(groups.h, pad(t.hours));
+        setGroup(groups.m, pad(t.minutes));
+        setGroup(groups.s, pad(t.seconds));
+        firstRender = false;
+    }
+
+    tick();
+    setInterval(tick, 250); // solo toca el DOM cuando cambia un dígito
+
+    /* =========================================================
+       ENTRADA + AUDIO
+       ========================================================= */
+    var entry = document.getElementById("entry");
+    var audio = document.getElementById("bg-audio");
+    var soundBtn = document.getElementById("sound");
+    var TARGET_VOLUME = 0.4;
+
+    var entered = false;
+    var userMuted = false;
+    var fadeRaf = 0;
+
+    audio.volume = 0;
+
+    function fadeVolume(to, ms, done) {
+        cancelAnimationFrame(fadeRaf);
+        var from = audio.volume;
+        var t0 = performance.now();
+        (function step(now) {
+            var k = Math.min(1, (now - t0) / ms);
+            audio.volume = Math.min(1, Math.max(0, from + (to - from) * k));
+            if (k < 1) {
+                fadeRaf = requestAnimationFrame(step);
+            } else if (done) {
+                done();
+            }
+        })(t0);
+    }
+
+    function setSoundUI(muted) {
+        soundBtn.classList.toggle("muted", muted);
+        soundBtn.setAttribute("aria-pressed", muted ? "true" : "false");
+        soundBtn.setAttribute("aria-label", muted ? "Activar audio" : "Silenciar audio");
+    }
+
+    function startAudio() {
+        if (!audio.paused) { return; } // evita doble reproducción
+        audio.muted = false;
+        audio.volume = 0;
+        var p = audio.play(); // llamado dentro del gesto del usuario
+        if (p && typeof p.then === "function") {
+            p.then(function () {
+                fadeVolume(TARGET_VOLUME, 5000);
+            }).catch(function () {
+                userMuted = true;
+                setSoundUI(true);
+            });
+        } else {
+            fadeVolume(TARGET_VOLUME, 5000);
+        }
+    }
+
+    function enter() {
+        if (entered) { return; }
+        entered = true;
+
+        startAudio();
+
+        document.body.classList.add("entered");
+        document.getElementById("stage").classList.add("on");
+        entry.classList.add("gone");
+        entry.setAttribute("aria-hidden", "true");
+        entry.removeAttribute("tabindex");
+        entry.blur();
+
+        setTimeout(function () {
+            if (entry.parentNode) { entry.parentNode.removeChild(entry); }
+        }, 4200);
+
+        scheduleGlitch();
+    }
+
+    entry.addEventListener("click", enter);
+    document.addEventListener("keydown", function (e) {
+        if (!entered && (e.key === "Enter" || e.key === " ")) {
+            e.preventDefault();
+            enter();
+        }
+    });
+
+    soundBtn.addEventListener("click", function () {
+        if (userMuted) {
+            userMuted = false;
+            audio.muted = false;
+            setSoundUI(false);
+            if (audio.paused) {
+                var p = audio.play();
+                if (p && p.catch) { p.catch(function () { userMuted = true; setSoundUI(true); }); }
+            }
+            fadeVolume(TARGET_VOLUME, 1400);
+        } else {
+            userMuted = true;
+            setSoundUI(true);
+            fadeVolume(0, 700, function () {
+                if (userMuted) { audio.muted = true; } // iOS ignora .volume, por eso también se silencia
+            });
+        }
+    });
+
+    // si el archivo no carga, el control se oculta en vez de mostrar un botón muerto
+    audio.addEventListener("error", function () {
+        soundBtn.classList.add("broken");
+    }, true);
+
+    // al volver a la pestaña (móvil), retoma el audio si no estaba silenciado
+    document.addEventListener("visibilitychange", function () {
+        if (!document.hidden && entered && !userMuted && audio.paused) {
+            var p = audio.play();
+            if (p && p.catch) { p.catch(function () {}); }
+        }
+    });
+
+    // al volver con "atrás" el navegador puede restaurar la página ya abierta:
+    // se recarga para exigir de nuevo el click inicial
+    window.addEventListener("pageshow", function (e) {
+        if (e.persisted) { location.reload(); }
+    });
+
+    /* =========================================================
+       DETALLES: glitch raro, polvo, paralaje
+       ========================================================= */
+    var counterEl = document.getElementById("counter");
+
+    function scheduleGlitch() {
+        if (reduceMotion) { return; }
+        var wait = 9000 + Math.random() * 14000;
+        setTimeout(function () {
+            if (!document.hidden) {
+                counterEl.classList.add("glitch");
+                setTimeout(function () { counterEl.classList.remove("glitch"); }, 420);
+            }
+            scheduleGlitch();
+        }, wait);
+    }
+
+    if (!reduceMotion) {
+        var dust = document.getElementById("dust");
+        for (var i = 0; i < 14; i++) {
+            var m = document.createElement("i");
+            var size = (1 + Math.random() * 1.4).toFixed(1) + "px";
+            m.style.left = (Math.random() * 100).toFixed(1) + "%";
+            m.style.width = size;
+            m.style.height = size;
+            m.style.animationDuration = (45 + Math.random() * 45).toFixed(0) + "s";
+            m.style.animationDelay = "-" + (Math.random() * 80).toFixed(0) + "s";
+            m.style.setProperty("--o", (0.08 + Math.random() * 0.17).toFixed(2));
+            m.style.setProperty("--dx", (Math.random() * 60 - 30).toFixed(0) + "px");
+            dust.appendChild(m);
+        }
+
+        if (window.matchMedia("(hover: hover) and (pointer: fine)").matches) {
+            var root = document.documentElement;
+            var queued = false, mx = 0, my = 0;
+            window.addEventListener("pointermove", function (e) {
+                mx = e.clientX / window.innerWidth - 0.5;
+                my = e.clientY / window.innerHeight - 0.5;
+                if (queued) { return; }
+                queued = true;
+                requestAnimationFrame(function () {
+                    root.style.setProperty("--px", mx.toFixed(3));
+                    root.style.setProperty("--py", my.toFixed(3));
+                    queued = false;
+                });
+            }, { passive: true });
+        }
+    }
+})();
+</script>
+</body>
+</html>
