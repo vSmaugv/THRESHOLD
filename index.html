@@ -490,6 +490,11 @@ body.entered .sound:hover,
     "use strict";
 
     var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    // Si el sistema pide "reducir movimiento" el glitch corre en versión suave
+    // (solo separación de color y dígitos corruptos, sin temblor, barridos ni apagones).
+    // Para probar la versión completa aunque tengas eso activado: abrí la página con #fx al final.
+    var forceFx = /[#?&]fx(?:=|&|$)/.test(location.search + location.hash);
+    var gentle = reduceMotion && !forceFx;
 
     /* =========================================================
        CONTADOR
@@ -707,7 +712,7 @@ body.entered .sound:hover,
        limitan los cambios bruscos de luz; con "reducir movimiento"
        activado en el sistema no se ejecuta nada de esto.
        ========================================================= */
-    var GLITCH_SFX = true; // false = glitch sin sonido
+    var GLITCH_SFX = false; // false = glitch sin sonido
 
     var world    = document.getElementById("world");
     var fxTurb   = document.getElementById("fx-turb");
@@ -735,6 +740,8 @@ body.entered .sound:hover,
         2: { dur: 1100, disp: [18, 70],  rgb: [5, 16],  shake: 8,  bars: 3, scr: 0.28, gap: [50, 105], roll: 0.05, thud: 0.55 },
         3: { dur: 2600, disp: [35, 170], rgb: [9, 34],  shake: 16, bars: 5, scr: 0.55, gap: [40, 95],  roll: 0.14, thud: 1 }
     };
+
+    var GENTLE = { dur: 650, disp: [8, 24], rgb: [3, 7], shake: 0, bars: 0, scr: 0.15, gap: [70, 130], roll: 0, thud: 0 };
 
     var glitching = false;
     var lastEpic = 0;
@@ -829,10 +836,12 @@ body.entered .sound:hover,
         var roll = Math.random() < cfg.roll * spike ? rnd(-9, 9) : 0;
         var sc = 1 + spike * (level === 3 ? 0.035 : 0.012);
         var ty = roll ? "calc(" + sy.toFixed(1) + "px + " + roll.toFixed(1) + "vh)" : sy.toFixed(1) + "px";
-        world.style.transform = "translate3d(" + sx.toFixed(1) + "px," + ty + ",0) scale(" + sc.toFixed(3) + ")";
+        if (!gentle) {
+            world.style.transform = "translate3d(" + sx.toFixed(1) + "px," + ty + ",0) scale(" + sc.toFixed(3) + ")";
+        }
 
         // 3) el contador: sacudida propia, brillo y parpadeo
-        counterEl.style.transform =
+        if (!gentle) counterEl.style.transform =
             "translate3d(" + (rnd(-1, 1) * cfg.shake * 1.6 * spike).toFixed(1) + "px," + (rnd(-1, 1) * cfg.shake * spike).toFixed(1) + "px,0)" +
             " scale(" + (1 + spike * rnd(0, 0.09)).toFixed(3) + ") skewX(" + (rnd(-1, 1) * 4 * spike).toFixed(1) + "deg)";
         counterEl.style.textShadow =
@@ -875,13 +884,14 @@ body.entered .sound:hover,
     }
 
     function glitch(level) {
-        if (reduceMotion || glitching || document.hidden || !entered) { return; }
+        if (glitching || document.hidden || !entered) { return; }
         var cfg = LEVELS[level];
+        if (gentle) { cfg = GENTLE; level = 1; }
         glitching = true;
         scrambling = true;
         document.body.classList.add("fx-hot");
         world.classList.add("fx-on");
-        runScan(cfg.dur);
+        if (!gentle) { runScan(cfg.dur); }
         sfx(level);
 
         if (level >= 2) { // apagón + luz tenue en el golpe inicial
@@ -981,7 +991,6 @@ body.entered .sound:hover,
     }
 
     function startGlitchSystem() {
-        if (reduceMotion) { return; }
         setTimeout(function () { fire(3); }, 3400); // el contador aparece a través de un colapso
         nextAuto();
         document.addEventListener("pointerdown", function (e) {
