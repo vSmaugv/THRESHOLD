@@ -273,19 +273,51 @@ body{
     50%{     opacity:.7; }
 }
 
-/* glitch muy sutil: un desgarro breve y raro */
-.counter.glitch{ animation:tear .36s steps(1, end) 1; }
-@keyframes tear{
-    0%{   transform:none; clip-path:inset(0); filter:none; }
-    10%{  transform:translate3d(-.045em,0,0) skewX(-2deg); clip-path:inset(0 0 58% 0);
-          filter:drop-shadow(.03em 0 0 rgba(var(--scar),.55)) drop-shadow(-.03em 0 0 rgba(var(--cold),.5)); }
-    22%{  transform:translate3d(.055em,0,0); clip-path:inset(46% 0 0 0);
-          filter:drop-shadow(-.03em 0 0 rgba(var(--scar),.5)) drop-shadow(.03em 0 0 rgba(var(--cold),.45)); }
-    34%{  transform:none; clip-path:inset(0); filter:none; }
-    50%{  transform:translate3d(.02em,0,0) skewX(1deg); clip-path:inset(22% 0 44% 0);
-          filter:drop-shadow(.025em 0 0 rgba(var(--scar),.45)); }
-    62%,100%{ transform:none; clip-path:inset(0); filter:none; }
+/* ---------- GLITCH DE PANTALLA COMPLETA (lo dirige el JS) ---------- */
+#world{
+    position:fixed;
+    inset:0;
+    z-index:0;
+    overflow:hidden;
+    background:var(--void);
 }
+#world.fx-on{ will-change:transform, filter; }
+.fx-layer{
+    position:fixed;
+    inset:0;
+    z-index:55;
+    pointer-events:none;
+    overflow:hidden;
+}
+.fx-bars, .fx-glow, .fx-black{ position:absolute; inset:0; }
+.fx-bar{
+    position:absolute;
+    left:0;
+    right:0;
+    height:2vh;
+    background:var(--ash);
+    mix-blend-mode:difference;
+    opacity:0;
+}
+.fx-glow, .fx-black{ opacity:0; }
+.fx-scan{
+    position:absolute;
+    left:0;
+    right:0;
+    top:-24vh;
+    height:22vh;
+    opacity:0;
+    background:linear-gradient(to bottom, transparent, rgba(189,186,177,.07) 55%, rgba(189,186,177,.2) 93%, transparent);
+}
+.fx-scan.run{ animation:scan var(--scan-dur, 900ms) cubic-bezier(.4,0,.6,1) 1 forwards; }
+@keyframes scan{
+    0%{   transform:translate3d(0,0,0);     opacity:0; }
+    8%{   opacity:1; }
+    92%{  opacity:1; }
+    100%{ transform:translate3d(0,145vh,0); opacity:0; }
+}
+.grain{ transition:opacity .12s linear; }
+body.fx-hot .grain{ opacity:.24; }
 
 /* frase mínima: si querés quitarla, borrá este bloque y el <p class="whisper"> */
 .whisper{
@@ -383,17 +415,31 @@ body.entered .sound:hover,
 
 <body>
 
+<!-- Filtro del glitch: desplazamiento en bandas horizontales + separación RGB.
+     Solo se aplica a #world mientras dura un glitch. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+        <filter id="fx" x="-5%" y="-5%" width="110%" height="110%" color-interpolation-filters="sRGB">
+            <feTurbulence id="fx-turb" type="fractalNoise" baseFrequency="0 0.02" numOctaves="1" seed="1" result="noise"/>
+            <feDisplacementMap id="fx-disp" in="SourceGraphic" in2="noise" scale="0" xChannelSelector="R" yChannelSelector="G" result="disp"/>
+            <feColorMatrix in="disp" type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="r"/>
+            <feColorMatrix in="disp" type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" result="g"/>
+            <feColorMatrix in="disp" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" result="b"/>
+            <feOffset id="fx-r" in="r" dx="0" dy="0" result="ro"/>
+            <feOffset id="fx-b" in="b" dx="0" dy="0" result="bo"/>
+            <feBlend in="ro" in2="g" mode="screen" result="rg"/>
+            <feBlend in="rg" in2="bo" mode="screen"/>
+        </filter>
+    </defs>
+</svg>
+
+<div id="world">
 <!-- Ambiente -->
 <div class="depth" aria-hidden="true">
     <div class="fog a"></div>
     <div class="fog b"></div>
     <div class="light"></div>
     <div class="dust" id="dust"></div>
-</div>
-
-<!-- Pantalla inicial: intercepta la interacción hasta el primer click -->
-<div id="entry" role="button" tabindex="0" aria-label="Click to continue">
-    <span class="entry-fade"><span class="entry-text">CLICK TO CONTINUE</span></span>
 </div>
 
 <!-- Escena -->
@@ -412,6 +458,20 @@ body.entered .sound:hover,
         <p class="whisper" lang="en">Something is coming.</p>
     </div>
 </main>
+</div><!-- /#world -->
+
+<!-- Pantalla inicial: intercepta la interacción hasta el primer click -->
+<div id="entry" role="button" tabindex="0" aria-label="Click to continue">
+    <span class="entry-fade"><span class="entry-text">CLICK TO CONTINUE</span></span>
+</div>
+
+<!-- Capas del glitch -->
+<div class="fx-layer" aria-hidden="true">
+    <div class="fx-bars" id="fx-bars"></div>
+    <div class="fx-scan" id="fx-scan"></div>
+    <div class="fx-glow" id="fx-glow"></div>
+    <div class="fx-black" id="fx-black"></div>
+</div>
 
 <!-- Audio local. Sin autoplay: solo se reproduce desde el handler del click inicial. -->
 <audio id="bg-audio" loop preload="auto" playsinline>
@@ -471,6 +531,7 @@ body.entered .sound:hover,
         s: document.getElementById("g-s")
     };
     var firstRender = true;
+    var scrambling = false; // true mientras un glitch está alterando los dígitos
 
     function setGroup(el, text) {
         // los días pueden pasar de 99 (3 dígitos): se agregan/quitan celdas según haga falta
@@ -496,6 +557,7 @@ body.entered .sound:hover,
     }
 
     function tick() {
+        if (scrambling) { return; }
         var t = getTimeRemaining(targetDate);
         setGroup(groups.d, pad(t.days));
         setGroup(groups.h, pad(t.hours));
@@ -576,7 +638,8 @@ body.entered .sound:hover,
             if (entry.parentNode) { entry.parentNode.removeChild(entry); }
         }, 4200);
 
-        scheduleGlitch();
+        initSfx();          // dentro del gesto del usuario
+        startGlitchSystem();
     }
 
     entry.addEventListener("click", enter);
@@ -626,20 +689,308 @@ body.entered .sound:hover,
     });
 
     /* =========================================================
-       DETALLES: glitch raro, polvo, paralaje
+       DETALLES: glitch, polvo y paralaje
        ========================================================= */
     var counterEl = document.getElementById("counter");
 
-    function scheduleGlitch() {
-        if (reduceMotion) { return; }
-        var wait = 9000 + Math.random() * 14000;
-        setTimeout(function () {
-            if (!document.hidden) {
-                counterEl.classList.add("glitch");
-                setTimeout(function () { counterEl.classList.remove("glitch"); }, 420);
+    /* =========================================================
+       GLITCH DE PANTALLA COMPLETA
+       Tres intensidades:
+         1 = interferencia corta, 2 = golpe fuerte, 3 = colapso épico.
+       Hay uno épico al aparecer el contador, otros al azar y uno
+       al hacer click/tap en cualquier parte de la pantalla.
+       Cada uno mezcla: desgarro por bandas + separación RGB de toda la
+       pantalla, temblor, pérdida de sincronía vertical, franjas
+       invertidas, barrido de luz, grano al máximo, dígitos corruptos
+       y un golpe de sonido sintetizado (respeta el botón de audio).
+       Seguridad: nunca hay destellos blancos a pantalla completa y se
+       limitan los cambios bruscos de luz; con "reducir movimiento"
+       activado en el sistema no se ejecuta nada de esto.
+       ========================================================= */
+    var GLITCH_SFX = true; // false = glitch sin sonido
+
+    var world    = document.getElementById("world");
+    var fxTurb   = document.getElementById("fx-turb");
+    var fxDisp   = document.getElementById("fx-disp");
+    var fxR      = document.getElementById("fx-r");
+    var fxB      = document.getElementById("fx-b");
+    var fxBlack  = document.getElementById("fx-black");
+    var fxGlow   = document.getElementById("fx-glow");
+    var fxScan   = document.getElementById("fx-scan");
+    var fxBarsEl = document.getElementById("fx-bars");
+    var whisperEl = document.querySelector(".whisper");
+    var whisperText = whisperEl ? whisperEl.textContent : "";
+    var NOISE_CHARS = "#/\\|+-_=<>?!0123456789";
+
+    var barEls = [];
+    for (var bi = 0; bi < 6; bi++) {
+        var barEl = document.createElement("i");
+        barEl.className = "fx-bar";
+        fxBarsEl.appendChild(barEl);
+        barEls.push(barEl);
+    }
+
+    var LEVELS = {
+        1: { dur: 600,  disp: [8, 30],   rgb: [2, 8],   shake: 3,  bars: 2, scr: 0.10, gap: [60, 120], roll: 0,    thud: 0 },
+        2: { dur: 1100, disp: [18, 70],  rgb: [5, 16],  shake: 8,  bars: 3, scr: 0.28, gap: [50, 105], roll: 0.05, thud: 0.55 },
+        3: { dur: 2600, disp: [35, 170], rgb: [9, 34],  shake: 16, bars: 5, scr: 0.55, gap: [40, 95],  roll: 0.14, thud: 1 }
+    };
+
+    var glitching = false;
+    var lastEpic = 0;
+    var lastManual = 0;
+
+    function rnd(a, b) { return a + Math.random() * (b - a); }
+
+    // intensidad a lo largo del glitch (0..1 de duración) -> 0..1
+    function envelope(t, level) {
+        if (t < 0.08) { return 0.35 + (t / 0.08) * 0.4; }
+        if (level === 3) {
+            if (t < 0.5)  { return 1; }
+            if (t < 0.62) { return 0.35; }   // falso respiro
+            if (t < 0.8)  { return 0.9; }    // segundo golpe
+            return Math.max(0, 1 - (t - 0.8) / 0.2);
+        }
+        if (t < 0.5) { return 1; }
+        return Math.max(0, 1 - (t - 0.5) / 0.5);
+    }
+
+    function blink(el, color, alpha, ms) {
+        el.style.transition = "none";
+        el.style.background = color;
+        el.style.opacity = alpha;
+        setTimeout(function () { el.style.opacity = "0"; }, ms);
+    }
+
+    function runScan(ms) {
+        fxScan.style.setProperty("--scan-dur", Math.min(ms, 1500) + "ms");
+        fxScan.classList.remove("run");
+        void fxScan.offsetWidth;
+        fxScan.classList.add("run");
+    }
+
+    function scrambleDigits(p) {
+        var t = getTimeRemaining(targetDate);
+        var real = [pad(t.days), pad(t.hours), pad(t.minutes), pad(t.seconds)];
+        var order = [groups.d, groups.h, groups.m, groups.s];
+        for (var g = 0; g < order.length; g++) {
+            var cells = order[g].children;
+            var offset = real[g].length - cells.length;
+            for (var i = 0; i < cells.length; i++) {
+                var ch = real[g].charAt(i + offset);
+                cells[i].textContent = (p > 0 && Math.random() < p) ? String(Math.floor(Math.random() * 10)) : ch;
             }
-            scheduleGlitch();
-        }, wait);
+        }
+    }
+
+    function scrambleWhisper(p) {
+        if (!whisperEl) { return; }
+        var out = "";
+        for (var i = 0; i < whisperText.length; i++) {
+            var c = whisperText.charAt(i);
+            out += (c !== " " && p > 0 && Math.random() < p) ? NOISE_CHARS.charAt(Math.floor(Math.random() * NOISE_CHARS.length)) : c;
+        }
+        whisperEl.textContent = out;
+    }
+
+    function clearState() {
+        world.style.filter = "";
+        world.style.transform = "";
+        counterEl.style.transform = "";
+        counterEl.style.textShadow = "";
+        counterEl.style.opacity = "";
+        for (var i = 0; i < barEls.length; i++) { barEls[i].style.opacity = "0"; }
+        fxDisp.setAttribute("scale", "0");
+        fxR.setAttribute("dx", "0"); fxR.setAttribute("dy", "0");
+        fxB.setAttribute("dx", "0"); fxB.setAttribute("dy", "0");
+        scrambleDigits(0);
+        scrambleWhisper(0);
+    }
+
+    function applyState(cfg, e, level) {
+        // fotogramas limpios cada tanto, sobre todo hacia el final: se siente inestable
+        var spike = Math.random() < (1 - e) * 0.5 ? 0 : e * rnd(0.35, 1);
+        if (spike === 0) { clearState(); return; }
+
+        // 1) desgarro por bandas + separación RGB de TODA la pantalla
+        fxDisp.setAttribute("scale", (cfg.disp[0] + (cfg.disp[1] - cfg.disp[0]) * spike).toFixed(1));
+        fxTurb.setAttribute("seed", String(1 + Math.floor(Math.random() * 9000)));
+        fxTurb.setAttribute("baseFrequency", "0 " + rnd(0.003, 0.05).toFixed(4));
+        var rgb = (cfg.rgb[0] + (cfg.rgb[1] - cfg.rgb[0]) * spike) * (Math.random() < 0.5 ? -1 : 1);
+        fxR.setAttribute("dx", rgb.toFixed(1));
+        fxR.setAttribute("dy", (rnd(-1, 1) * spike * 2).toFixed(1));
+        fxB.setAttribute("dx", (-rgb * rnd(0.6, 1.3)).toFixed(1));
+        fxB.setAttribute("dy", (rnd(-1, 1) * spike * 2).toFixed(1));
+        world.style.filter = "url(#fx)";
+
+        // 2) temblor, pulso de escala y a veces pérdida de sincronía vertical
+        var sx = rnd(-1, 1) * cfg.shake * spike;
+        var sy = rnd(-1, 1) * cfg.shake * 0.5 * spike;
+        var roll = Math.random() < cfg.roll * spike ? rnd(-9, 9) : 0;
+        var sc = 1 + spike * (level === 3 ? 0.035 : 0.012);
+        var ty = roll ? "calc(" + sy.toFixed(1) + "px + " + roll.toFixed(1) + "vh)" : sy.toFixed(1) + "px";
+        world.style.transform = "translate3d(" + sx.toFixed(1) + "px," + ty + ",0) scale(" + sc.toFixed(3) + ")";
+
+        // 3) el contador: sacudida propia, brillo y parpadeo
+        counterEl.style.transform =
+            "translate3d(" + (rnd(-1, 1) * cfg.shake * 1.6 * spike).toFixed(1) + "px," + (rnd(-1, 1) * cfg.shake * spike).toFixed(1) + "px,0)" +
+            " scale(" + (1 + spike * rnd(0, 0.09)).toFixed(3) + ") skewX(" + (rnd(-1, 1) * 4 * spike).toFixed(1) + "deg)";
+        counterEl.style.textShadow =
+            "0 0 .3em rgba(224,219,205," + (0.28 + 0.4 * spike).toFixed(2) + "), 0 0 1.1em rgba(189,186,177," + (0.12 + 0.2 * spike).toFixed(2) + ")";
+        counterEl.style.opacity = (spike > 0.75 && Math.random() < 0.22) ? "0.2" : "";
+
+        // 4) franjas invertidas (pocas y finas, para no producir destellos grandes)
+        var maxH = level === 3 ? 4 : 3;
+        for (var i = 0; i < barEls.length; i++) {
+            var b = barEls[i];
+            if (i < cfg.bars && Math.random() < 0.85) {
+                b.style.top = rnd(0, 96).toFixed(1) + "%";
+                b.style.height = rnd(0.5, maxH).toFixed(1) + "vh";
+                b.style.opacity = rnd(0.2, 0.5).toFixed(2);
+            } else {
+                b.style.opacity = "0";
+            }
+        }
+
+        // 5) dígitos y frase corruptos
+        scrambleDigits(Math.min(0.9, cfg.scr * spike * 1.3));
+        scrambleWhisper(Math.min(0.6, cfg.scr * spike));
+    }
+
+    function finish(level) {
+        clearState();
+        world.classList.remove("fx-on");
+        document.body.classList.remove("fx-hot");
+        scrambling = false;
+        glitching = false;
+        tick();
+        if (level === 3) { // réplica final: oscurece y se disipa
+            fxBlack.style.transition = "none";
+            fxBlack.style.background = "#000";
+            fxBlack.style.opacity = "0.5";
+            void fxBlack.offsetWidth;
+            fxBlack.style.transition = "opacity 1.2s ease-out";
+            fxBlack.style.opacity = "0";
+        }
+    }
+
+    function glitch(level) {
+        if (reduceMotion || glitching || document.hidden || !entered) { return; }
+        var cfg = LEVELS[level];
+        glitching = true;
+        scrambling = true;
+        document.body.classList.add("fx-hot");
+        world.classList.add("fx-on");
+        runScan(cfg.dur);
+        sfx(level);
+
+        if (level >= 2) { // apagón + luz tenue en el golpe inicial
+            setTimeout(function () { blink(fxBlack, "#000", 0.85, 70); }, cfg.dur * 0.10);
+            setTimeout(function () { blink(fxGlow, "rgb(189,186,177)", 0.14, 60); }, cfg.dur * 0.10 + 90);
+        }
+        if (level === 3) { // segundo apagón, en el "falso respiro"
+            setTimeout(function () { blink(fxBlack, "#000", 0.7, 90); }, cfg.dur * 0.62);
+        }
+
+        var t0 = performance.now();
+        var nextAt = 0;
+        (function frame(now) {
+            var t = (now - t0) / cfg.dur;
+            if (t >= 1) { finish(level); return; }
+            if (now >= nextAt) {
+                applyState(cfg, envelope(t, level), level);
+                nextAt = now + rnd(cfg.gap[0], cfg.gap[1]);
+            }
+            requestAnimationFrame(frame);
+        })(t0);
+    }
+
+    /* --- sonido del glitch (Web Audio, sintetizado: no usa archivos) --- */
+    var ac = null;
+
+    function initSfx() {
+        if (!GLITCH_SFX) { return; }
+        try {
+            var AC = window.AudioContext || window.webkitAudioContext;
+            if (AC) {
+                ac = new AC();
+                if (ac.state === "suspended") { ac.resume(); }
+            }
+        } catch (err) { ac = null; }
+    }
+
+    function sfx(level) {
+        if (!ac || userMuted || audio.muted || document.hidden) { return; }
+        if (ac.state === "suspended") { ac.resume(); }
+        var cfg = LEVELS[level];
+        var dur = cfg.dur / 1000;
+        var sr = ac.sampleRate;
+        var len = Math.floor(sr * dur);
+        var buf = ac.createBuffer(1, len, sr);
+        var data = buf.getChannelData(0);
+        var i = 0, val = 0;
+        while (i < len) { // ruido digital entrecortado, con "crunch" por muestreo retenido
+            var seg = Math.floor(sr * rnd(0.012, 0.085));
+            var amp = Math.random() < 0.68 ? rnd(0.25, 1) : 0;
+            var hold = 1 + Math.floor(Math.random() * 14);
+            for (var j = 0; j < seg && i < len; j++, i++) {
+                if (j % hold === 0) { val = Math.random() * 2 - 1; }
+                data[i] = val * amp * envelope(i / len, level);
+            }
+        }
+        var src = ac.createBufferSource();
+        src.buffer = buf;
+        var hp = ac.createBiquadFilter();
+        hp.type = "highpass";
+        hp.frequency.value = 900;
+        var g = ac.createGain();
+        g.gain.value = [0, 0.07, 0.12, 0.2][level];
+        src.connect(hp); hp.connect(g); g.connect(ac.destination);
+        src.start();
+
+        if (cfg.thud) { // golpe grave que coincide con el apagón
+            var now = ac.currentTime + dur * 0.10;
+            var o = ac.createOscillator();
+            var og = ac.createGain();
+            o.type = "sine";
+            o.frequency.setValueAtTime(90, now);
+            o.frequency.exponentialRampToValueAtTime(30, now + 0.45);
+            og.gain.setValueAtTime(0.32 * cfg.thud, now);
+            og.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+            o.connect(og); og.connect(ac.destination);
+            o.start(now);
+            o.stop(now + 0.65);
+        }
+    }
+
+    /* --- cuándo se dispara --- */
+    function fire(level) {
+        if (glitching) { return; }
+        if (level === 3) { lastEpic = performance.now(); }
+        glitch(level);
+    }
+
+    function nextAuto() {
+        setTimeout(function () {
+            var r = Math.random();
+            var level = r < 0.55 ? 1 : (r < 0.88 ? 2 : 3);
+            if (level === 3 && performance.now() - lastEpic < 40000) { level = 2; }
+            fire(level);
+            nextAuto();
+        }, rnd(7000, 15000));
+    }
+
+    function startGlitchSystem() {
+        if (reduceMotion) { return; }
+        setTimeout(function () { fire(3); }, 3400); // el contador aparece a través de un colapso
+        nextAuto();
+        document.addEventListener("pointerdown", function (e) {
+            if (e.target.closest && e.target.closest("#sound")) { return; }
+            var now = performance.now();
+            if (now - lastManual < 2500) { return; }
+            lastManual = now;
+            fire(Math.random() < 0.25 ? 3 : 2);
+        });
     }
 
     if (!reduceMotion) {
